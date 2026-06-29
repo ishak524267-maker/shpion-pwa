@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Шпион Pro — party-game для друзей">
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0a0a12">
+
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <link rel="icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <title>Шпион</title>
+
+    <script src="words.js"></script>
+    <link rel="stylesheet" href="./src/styles.css">
+</head>
+
+<body>
+    <div class="ambient-bg" aria-hidden="true">
+        <span class="orb orb-1"></span>
+        <span class="orb orb-2"></span>
+        <span class="orb orb-3"></span>
+    </div>
+
+    <div id="setup-screen" class="screen">
+        <h1>🕵️ Шпион Pro</h1>
+        <div class="subhead">
+            Минималистичная party-game для друзей
+        </div>
+       
+        <label for="theme-select">Тема игры</label>
+        <select id="theme-select">
+            <option value="historical_figures">📜 Исторические личности</option>
+            <option value="clash_royale">⚔️ Карты Клеш Рояль</option>
+            <option value="anime">🍙 Аниме</option>
+            <option value="anime_characters">🏮 Аниме персонажи</option>
+            <option value="movies">🎬 Фильмы</option>
+            <option value="teachers">👨‍🏫 Учителя</option>
+            <option value="superheroes">🦸‍♂️ Супергерои</option>
+            <option value="villains">🦹 Суперзлодеи</option>
+            <option value="countries">🌍 Страны</option>
+            <option value="celebrities">🌟 Знаменитости</option>
+            <option value="cartoons">🦄 Мультфильмы</option>
+            <option value="tv_series">📺 Сериалы</option>
+            <option value="brawl_stars">🌵 Brawl Stars</option>
+            <option value="cs2_weapons">🔫 Оружие CS 2</option>
+            <option value="games">🎮 Видеоигры</option>
+            <option value="memes">😂 Мемы</option>
+            <option value="food">🍕 Еда</option>
+            <option value="cartoon_characters">🕴️ Персонажи Мультиков</option>
+            <option value="bobiki">😎 Мы</option>
+            <option value="cars">🚗 Машины</option>
+            <option value="moto">🏍️ Мотоциклы</option>
+            <option value="prof">👩‍🏭 Профессии</option>
+            <option value="random">🎲 РАНДОМ</option>
+            <option value="custom">✍️ СВОЯ ТЕМА</option>
+        </select>
+
+        <div id="custom-theme-container" class="hidden">
+            <label for="custom-words">Слова через запятую</label>
+            <textarea id="custom-words" placeholder="Лампа, Телефон, Кот..."></textarea>
+        </div>
+
+        <div class="row">
+            <div>
+                <label for="players-input">Игроков</label>
+                <input type="number" id="players-input" min="3" max="15" value="4">
+            </div>
+            <div>
+                <label for="spies-input">Шпионов</label>
+                <input type="number" id="spies-input" min="1" max="5" value="1">
+            </div>
+        </div>
+
+        <label for="timer-select">Время обсуждения</label>
+        <select id="timer-select">
+            <option value="180">3 минуты</option>
+            <option value="300" selected>5 минут</option>
+            <option value="420">7 минут</option>
+            <option value="600">10 минут</option>
+        </select>
+
+        <div class="toggle-container">
+            <span class="toggle-text">
+                Ложная локация<br>
+                <small>Шпион видит другое слово</small>
+            </span>
+            <label class="switch">
+                <input type="checkbox" id="false-location-mode">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <button id="start-game-btn" class="mt-8">Начать игру</button>
+    </div>
+
+    <div id="pass-screen" class="screen hidden">
+        <div class="card">
+            <h2 class="pass-title">Передай телефон</h2>
+            <h1 id="pass-player-number" class="h1-accent">Игроку №1</h1>
+        </div>
+        <button id="show-role-btn">Показать роль</button>
+    </div>
+
+    <div id="timer-screen" class="screen hidden">
+        <h1 class="title-tight">Обсуждение</h1>
+        <div class="subhead subhead-neutral">
+            Найдите шпиона до конца времени
+        </div>
+        <div id="timer-display" class="timer-display">05:00</div>
+        <button id="toggle-timer-btn" class="mb-4">Пауза</button>
+        <button id="new-game-btn" class="button-secondary">В меню</button>
+    </div>
+
+    <!-- Экран конца времени — вместо alert() -->
+    <div id="timeout-screen" class="screen hidden">
+        <div class="card card-padded">
+            <div class="emoji-hero">⏰</div>
+            <h1 class="h1-compact">Время вышло!</h1>
+            <div class="subhead m-0">Пора голосовать — кто шпион?</div>
+        </div>
+        <button id="timeout-new-game-btn">Новая игра</button>
+    </div>
+    
+    <div id="reveal-overlay" class="reveal-overlay">
+        <div class="reveal-card">
+            <div class="reveal-title">Секретное слово</div>
+            <div id="cinematic-role" class="reveal-word"></div>
+            <div class="tap-hint">Нажми, чтобы скрыть</div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true">
+        <div class="toast-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 9v4"></path>
+                <path d="M12 17h.01"></path>
+                <path d="M10.29 3.86l-8.29 14.36A2 2 0 0 0 3.72 21h16.56a2 2 0 0 0 1.72-2.78L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            </svg>
+        </div>
+        <div id="toast-text" class="toast-text"></div>
+        <div id="toast-actions" class="toast-actions"></div>
+    </div>
+
+    <script type="module" src="./src/app.js"></script>
+</body>
+</html>
