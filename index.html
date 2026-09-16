@@ -32,9 +32,22 @@
             Минималистичная party-game для друзей
         </div>
        
-        <label for="theme-select">Тема игры</label>
-        <select id="theme-select">
-            <option value="historical_figures">📜 Исторические личности</option>
+        <span id="theme-label" class="field-label">Тема игры</span>
+        <button
+            type="button"
+            id="theme-picker-trigger"
+            class="theme-picker-trigger"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            aria-controls="theme-picker-list"
+            aria-labelledby="theme-label"
+        >
+            <span class="theme-picker-trigger-emoji" id="theme-trigger-emoji" aria-hidden="true">📜</span>
+            <span class="theme-picker-trigger-text" id="theme-trigger-text">Исторические личности</span>
+            <span class="theme-picker-chevron" aria-hidden="true"></span>
+        </button>
+        <select id="theme-select" class="visually-hidden" tabindex="-1" aria-hidden="true">
+            <option value="historical_figures" selected>📜 Исторические личности</option>
             <option value="clash_royale">⚔️ Карты Клеш Рояль</option>
             <option value="anime">🍙 Аниме</option>
             <option value="anime_characters">🏮 Аниме персонажи</option>
@@ -99,9 +112,12 @@
     </div>
 
     <div id="pass-screen" class="screen hidden">
-        <div class="card">
-            <h2 class="pass-title">Передай телефон</h2>
-            <h1 id="pass-player-number" class="h1-accent">Игроку №1</h1>
+        <div class="pass-stack">
+            <div id="pass-theme-name" class="theme-badge" aria-live="polite"></div>
+            <div class="card">
+                <h2 class="pass-title">Передай телефон</h2>
+                <h1 id="pass-player-number" class="h1-accent">Игроку №1</h1>
+            </div>
         </div>
         <button id="show-role-btn">Показать роль</button>
     </div>
@@ -126,12 +142,31 @@
         <button id="timeout-new-game-btn">Новая игра</button>
     </div>
     
-    <div id="reveal-overlay" class="reveal-overlay">
-        <div class="reveal-card">
-            <div class="reveal-title">Секретное слово</div>
-            <div id="cinematic-role" class="reveal-word"></div>
-            <div class="tap-hint">Нажми, чтобы скрыть</div>
+    <div id="theme-picker-overlay" class="theme-picker-overlay" hidden>
+        <div class="theme-picker-backdrop" data-theme-picker-close></div>
+        <div
+            class="theme-picker-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="theme-picker-title"
+        >
+            <div id="theme-picker-title" class="theme-picker-title">Выберите тему</div>
+            <ul id="theme-picker-list" class="theme-picker-list" role="listbox" aria-labelledby="theme-picker-title"></ul>
         </div>
+    </div>
+
+    <div id="reveal-overlay" class="reveal-overlay">
+        <div class="reveal-stack">
+            <div id="reveal-theme-name" class="theme-badge" aria-live="polite"></div>
+            <div class="reveal-card">
+                <div class="reveal-title">Секретное слово</div>
+                <div id="cinematic-role" class="reveal-word"></div>
+                <div class="tap-hint">Нажми, чтобы скрыть</div>
+            </div>
+        </div>
+        <button type="button" id="who-is-this-btn" class="who-is-this-btn" hidden aria-label="Кто или что это">
+            Кто/Что это?
+        </button>
     </div>
 
     <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true">

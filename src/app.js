@@ -1,29 +1,35 @@
 const themeColors = {
-  historical_figures: "#d4af37",
-  clash_royale: "#3b82f6",
-  anime: "#ec4899",
-  anime_characters: "#f43f5e",
-  movies: "#eab308",
-  teachers: "#8b5cf6",
-  superheroes: "#ef4444",
-  villains: "#7c3aed",
-  countries: "#10b981",
-  celebrities: "#f59e0b",
-  cartoons: "#06b6d4",
-  tv_series: "#6366f1",
-  brawl_stars: "#f59e0b",
-  cs2_weapons: "#f97316",
-  games: "#22c55e",
-  memes: "#14b8a6",
-  food: "#fb923c",
-  cartoon_characters: "#84cc16",
-  bobiki: "#a855f7",
-  cars: "#64748b",
-  moto: "#dc2626",
-  prof: "#0ea5e9",
-  random: "#3b82f6",
-  custom: "#a855f7",
+  historical_figures: "#d4af37", 
+  clash_royale: "#2563eb",       
+  anime: "#ec4899",              
+  anime_characters: "#e11d48",   
+  movies: "#eab308",             
+  teachers: "#8b5cf6",           
+  superheroes: "#ef4444",        
+  villains: "#9333ea",           
+  countries: "#10b981",          
+  celebrities: "#facc15",        
+  cartoons: "#06b6d4",           
+  tv_series: "#6366f1",          
+  brawl_stars: "#ff9800",       
+  cs2_weapons: "#ea580c",        
+  games: "#22c55e",              
+  memes: "#14b8a6",              
+  food: "#ff7849",               
+  cartoon_characters: "#84cc16", 
+  bobiki: "#a855f7",             
+  cars: "#38bdf8",               
+  moto: "#be123c",              
+  prof: "#0284c7",               
+  random: "#818cf8",          
+  custom: "#d946ef",             
 };
+
+function hexToRgb(hex) {
+  const clean = hex.replace("#", "");
+  const num = Number.parseInt(clean, 16);
+  return `${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}`;
+}
 
 function vibrate(pattern) {
   if (!navigator.vibrate) return;
@@ -125,6 +131,11 @@ function main() {
   };
 
   const themeSelect = qs("theme-select");
+  const themePickerTrigger = qs("theme-picker-trigger");
+  const themeTriggerEmoji = qs("theme-trigger-emoji");
+  const themeTriggerText = qs("theme-trigger-text");
+  const themePickerOverlay = qs("theme-picker-overlay");
+  const themePickerList = qs("theme-picker-list");
   const customContainer = qs("custom-theme-container");
   const customWordsInput = qs("custom-words");
   const playersInput = qs("players-input");
@@ -134,6 +145,7 @@ function main() {
   const timerDisplay = qs("timer-display");
   const revealOverlay = qs("reveal-overlay");
   const cinematicRole = qs("cinematic-role");
+  const whoIsThisBtn = qs("who-is-this-btn");
 
   // state
   const wordsBag = {};
@@ -145,22 +157,185 @@ function main() {
   let timerInterval = null;
   let timeLeft = 300;
   let isTimerRunning = false;
+  let themePickerClosing = false;
+  let whoIsThisWord = "";
+
+  function parseThemeOptionLabel(raw) {
+    const text = String(raw || "").trim();
+    const match = text.match(/^(\S+)\s+(.+)$/u);
+    if (!match) return { emoji: "🎲", label: text || "Тема" };
+    return { emoji: match[1], label: match[2] };
+  }
+
+  function syncThemeTrigger() {
+    const option = themeSelect.selectedOptions[0];
+    const { emoji, label } = parseThemeOptionLabel(option?.textContent);
+    themeTriggerEmoji.textContent = emoji;
+    themeTriggerText.textContent = label;
+  }
+
+  function buildThemePickerList() {
+    themePickerList.innerHTML = "";
+    for (const option of themeSelect.options) {
+      const { emoji, label } = parseThemeOptionLabel(option.textContent);
+      const li = document.createElement("li");
+      li.setAttribute("role", "presentation");
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "theme-picker-option";
+      btn.setAttribute("role", "option");
+      btn.dataset.value = option.value;
+      btn.setAttribute("aria-selected", option.selected ? "true" : "false");
+
+      const emojiEl = document.createElement("span");
+      emojiEl.className = "theme-picker-option-emoji";
+      emojiEl.setAttribute("aria-hidden", "true");
+      emojiEl.textContent = emoji;
+
+      const textEl = document.createElement("span");
+      textEl.className = "theme-picker-option-text";
+      textEl.textContent = label;
+
+      const checkEl = document.createElement("span");
+      checkEl.className = "theme-picker-option-check";
+      checkEl.setAttribute("aria-hidden", "true");
+
+      btn.append(emojiEl, textEl, checkEl);
+      btn.addEventListener("click", () => {
+        clickFeedback();
+        selectTheme(option.value);
+        closeThemePicker();
+      });
+
+      li.appendChild(btn);
+      themePickerList.appendChild(li);
+    }
+  }
+
+  function markSelectedThemeOption() {
+    const value = themeSelect.value;
+    for (const btn of themePickerList.querySelectorAll(".theme-picker-option")) {
+      btn.setAttribute("aria-selected", btn.dataset.value === value ? "true" : "false");
+    }
+  }
+
+  function openThemePicker() {
+    if (themePickerClosing || themePickerOverlay.classList.contains("open")) return;
+
+    markSelectedThemeOption();
+    themePickerOverlay.hidden = false;
+    themePickerOverlay.classList.remove("closing");
+    themePickerTrigger.setAttribute("aria-expanded", "true");
+    document.body.classList.add("modal-open");
+
+    themePickerOverlay.offsetHeight;
+    requestAnimationFrame(() => {
+      themePickerOverlay.classList.add("open");
+      const selected = themePickerList.querySelector('.theme-picker-option[aria-selected="true"]');
+      selected?.scrollIntoView({ block: "nearest" });
+      selected?.focus();
+    });
+  }
+
+  function closeThemePicker() {
+    if (!themePickerOverlay.classList.contains("open") || themePickerClosing) return;
+
+    themePickerClosing = true;
+    themePickerOverlay.classList.add("closing");
+    themePickerOverlay.classList.remove("open");
+    themePickerTrigger.setAttribute("aria-expanded", "false");
+
+    const finish = () => {
+      themePickerOverlay.classList.remove("closing");
+      themePickerOverlay.hidden = true;
+      themePickerClosing = false;
+      if (!revealOverlay.classList.contains("active")) {
+        document.body.classList.remove("modal-open");
+      }
+      themePickerTrigger.focus();
+    };
+
+    const onEnd = event => {
+      if (event.target !== themePickerOverlay) return;
+      themePickerOverlay.removeEventListener("transitionend", onEnd);
+      window.clearTimeout(fallbackTimer);
+      finish();
+    };
+
+    themePickerOverlay.addEventListener("transitionend", onEnd);
+    const fallbackTimer = window.setTimeout(() => {
+      themePickerOverlay.removeEventListener("transitionend", onEnd);
+      finish();
+    }, 280);
+  }
+
+  function selectTheme(value) {
+    if (themeSelect.value === value) {
+      syncThemeTrigger();
+      return;
+    }
+    themeSelect.value = value;
+    themeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+  }
 
   function setAccentForTheme(theme) {
     const newColor = themeColors[theme] || "#a855f7";
+    const rgb = hexToRgb(newColor);
     document.documentElement.style.setProperty("--accent-color", newColor);
+    document.documentElement.style.setProperty("--accent-rgb", rgb);
+
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) {
+      metaTheme.setAttribute("content", "#0c0e16");
+    }
   }
 
+  buildThemePickerList();
+  syncThemeTrigger();
   setAccentForTheme(themeSelect.value);
+
+  themePickerTrigger.addEventListener("click", () => {
+    clickFeedback();
+    if (themePickerOverlay.classList.contains("open")) {
+      closeThemePicker();
+    } else {
+      openThemePicker();
+    }
+  });
+
+  themePickerOverlay.querySelectorAll("[data-theme-picker-close]").forEach(el => {
+    el.addEventListener("click", () => closeThemePicker());
+  });
+
+  document.addEventListener("keydown", event => {
+    if (event.key !== "Escape") return;
+    if (!themePickerOverlay.classList.contains("open")) return;
+    event.preventDefault();
+    closeThemePicker();
+  });
 
   themeSelect.addEventListener("change", () => {
     const isCustom = themeSelect.value === "custom";
     customContainer.classList.toggle("hidden", !isCustom);
     setAccentForTheme(themeSelect.value);
+    syncThemeTrigger();
+    markSelectedThemeOption();
   });
+  function getSelectedThemeLabel() {
+    const option = themeSelect.selectedOptions[0];
+    return parseThemeOptionLabel(option?.textContent).label;
+  }
+
+  function syncInGameThemeBadges() {
+    const label = getSelectedThemeLabel();
+    qs("pass-theme-name").textContent = label;
+    qs("reveal-theme-name").textContent = label;
+  }
 
   function showPassScreen() {
     hideAllScreens(Object.values(screens));
+    syncInGameThemeBadges();
     qs("pass-player-number").textContent = `Игроку №${currentPlayerIndex}`;
     screens.pass.classList.remove("hidden");
   }
@@ -276,13 +451,61 @@ function main() {
     showPassScreen();
   });
 
+  function hideWhoIsThisBtn() {
+    whoIsThisBtn.classList.remove("is-visible");
+    whoIsThisBtn.hidden = true;
+    whoIsThisWord = "";
+  }
+
+  function showWhoIsThisBtn(word) {
+    whoIsThisWord = String(word || "").trim();
+    if (!whoIsThisWord) {
+      hideWhoIsThisBtn();
+      return;
+    }
+
+    whoIsThisBtn.hidden = false;
+    whoIsThisBtn.classList.remove("is-visible");
+    whoIsThisBtn.offsetHeight;
+    requestAnimationFrame(() => {
+      whoIsThisBtn.classList.add("is-visible");
+    });
+  }
+
+  function openWordSearch(themeLabel, word) {
+    const query = `${themeLabel} ${word}`.trim();
+    if (!query) return;
+
+    const url = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+    const opened = window.open(url, "_blank", "noopener,noreferrer");
+    if (opened) return;
+
+    // Fallback для Android / PWA, если popup заблокирован
+    const link = document.createElement("a");
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  whoIsThisBtn.addEventListener("click", event => {
+    event.stopPropagation();
+    clickFeedback();
+    openWordSearch(getSelectedThemeLabel(), whoIsThisWord);
+  });
+
   qs("show-role-btn").addEventListener("click", () => {
     clickFeedback();
     hideAllScreens(Object.values(screens));
+    hideWhoIsThisBtn();
 
     let text = "";
     let className = "";
     const isSpy = spyPlayerNumbers.includes(currentPlayerIndex);
+    const isPlainSpy = isSpy && !falseLocationMode.checked;
 
     if (isSpy) {
       if (falseLocationMode.checked) {
@@ -303,11 +526,18 @@ function main() {
     document.body.classList.add("modal-open");
     // форс-рефлоу, чтобы анимация стабильно проигрывалась
     revealOverlay.offsetHeight;
-    requestAnimationFrame(() => revealOverlay.classList.add("active"));
+    requestAnimationFrame(() => {
+      revealOverlay.classList.add("active");
+      // Кнопка только когда показывают слово: мирный или шпион с ложной локацией
+      if (!isPlainSpy) {
+        showWhoIsThisBtn(text);
+      }
+    });
     vibrate([60, 40, 60]);
   });
 
   revealOverlay.addEventListener("click", () => {
+    hideWhoIsThisBtn();
     revealOverlay.classList.remove("active");
     document.body.classList.remove("modal-open");
 
