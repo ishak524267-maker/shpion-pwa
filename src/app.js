@@ -25,6 +25,7 @@ const themeColors = {
   liminals: "#94a3b8",
   creepypasta: "#7f1d1d",
   myth_cr: "#b45309",
+  horrors: "#295556",
   film_places: "#c026d3",
   cities: "#0ea5e9",
   music: "#db2777",
@@ -186,10 +187,238 @@ function main() {
     themeTriggerText.textContent = label;
   }
 
-  function buildThemePickerList() {
-    themePickerList.innerHTML = "";
+  // ---- Поиск тем: нормализация, нечёткое сравнение, подсветка ----
+  // Всё строится из themeSelect.options, поэтому новые темы
+  // (новый <option> + ключ в themesData) подхватываются без изменения кода.
+  const themeSearchInput = document.getElementById("theme-search-input");
+  const themeSearchClear = document.getElementById("theme-search-clear");
+  const themeSearchCount = document.getElementById("theme-search-count");
+  const themeSearchEmpty = document.getElementById("theme-search-empty");
+  let themeSearchDebounce = null;
+
+  function normalizeThemeText(raw) {
+    return String(raw || "")
+      .toLowerCase()
+      .replace(/ё/g, "е")
+      .replace(/[^a-zа-я0-9\s-]+/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function normalizeKeepLength(raw) {
+    return String(raw || "").toLowerCase().replace(/ё/g, "е");
+  }
+
+  // Транслит кириллица -> латиница для поиска "бравл" ~ "brawl", "старс" ~ "stars"
+  const RU_TRANSLIT_MAP = {
+    а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "yo",
+    ж: "zh", з: "z", и: "i", й: "y", к: "k", л: "l", м: "m",
+    н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u",
+    ф: "f", х: "h", ц: "ts", ч: "ch", ш: "sh", щ: "sch",
+    ъ: "", ы: "y", ь: "", э: "e", ю: "yu", я: "ya",
+  };
+
+  function translitRu(s) {
+    return String(s || "").replace(/[а-яё]/g, ch => RU_TRANSLIT_MAP[ch] ?? ch);
+  }
+
+  function escapeHtml(raw) {
+    return String(raw || "").replace(/[&<>"']/g, ch => {
+      switch (ch) {
+        case "&": return "&amp;";
+        case "<": return "&lt;";
+        case ">": return "&gt;";
+        case '"': return "&quot;";
+        case "'": return "&#39;";
+        default: return ch;
+      }
+    });
+  }
+
+  function fuzzyThreshold(queryLen) {
+    if (queryLen <= 1) return 0;
+    if (queryLen <= 4) return 1;
+    if (queryLen <= 7) return 2;
+    return 3;
+  }
+
+  // Дистанция Левенштейна с ранним выходом: верну > maxDist если далеко
+  function levenshteinCapped(a, b, maxDist) {
+    if (a === b) return 0;
+    if (Math.abs(a.length - b.length) > maxDist) return maxDist + 1;
+    if (a.length === 0) return b.length;
+    if (b.length === 0) return a.length;
+
+    let prev = new Array(b.length + 1);
+    let curr = new Array(b.length + 1);
+    for (let j = 0; j <= b.length; j++) prev[j] = j;
+
+    for (let i = 1; i <= a.length; i++) {
+      curr[0] = i;
+      let rowMin = curr[0];
+      const ca = a.charCodeAt(i - 1);
+      for (let j = 1; j <= b.length; j++) {
+        const cost = ca === b.charCodeAt(j - 1) ? 0 : 1;
+        const del = prev[j] + 1;
+        const ins = curr[j - 1] + 1;
+        const sub = prev[j - 1] + cost;
+        const val = del < ins ? (del < sub ? del : sub) : (ins < sub ? ins : sub);
+        curr[j] = val;
+        if (val < rowMin) rowMin = val;
+      }
+      if (rowMin > maxDist) return maxDist + 1;
+      const tmp = prev;
+      prev = curr;
+      curr = tmp;
+    }
+    return prev[b.length];
+  }
+
+  function scoreTokenAgainstLabelToken(queryToken, labelToken) {
+    if (!queryToken || !labelToken) return 0;
+    if (labelToken === queryToken) return 100;
+    if (labelToken.startsWith(queryToken)) return 80;
+    if (labelToken.includes(queryToken)) return 65;
+
+    // Транслит-вариант: ищем и по "bravl" ~ "brawl"
+    const tq = translitRu(queryToken);
+    const tl = translitRu(labelToken);
+    if (tq !== queryToken || tl !== labelToken) {
+      if (tl === tq) return 90;
+      if (tl.startsWith(tq)) return 70;
+      if (tl.includes(tq)) return 55;
+    }
+
+    const threshold = fuzzyThreshold(queryToken.length);
+    let best = 0;
+    if (threshold > 0) {
+      const dist = levenshteinCapped(queryToken, labelToken, threshold);
+      if (dist <= threshold) best = 45 - dist * 8;
+    }
+    if (tq !== queryToken || tl !== labelToken) {
+      const tThreshold = fuzzyThreshold(tq.length);
+      if (tThreshold > 0) {
+        const tDist = levenshteinCapped(tq, tl, tThreshold);
+        if (tDist <= tThreshold) best = Math.max(best, 40 - tDist * 8);
+      }
+    }
+    return best;
+  }
+
+  // 0 = не подходит, больше = лучше
+  function scoreThemeMatch(normalizedLabel, normalizedQuery) {
+    if (!normalizedQuery) return 50;
+    if (normalizedLabel === normalizedQuery) return 120;
+    if (normalizedLabel.startsWith(normalizedQuery)) return 100;
+    if (normalizedLabel.includes(normalizedQuery)) return 80;
+
+    const labelTokens = normalizedLabel.split(/[\s-]+/).filter(Boolean);
+    const queryTokens = normalizedQuery.split(/[\s-]+/).filter(Boolean);
+    if (queryTokens.length === 0) return 50;
+
+    // Слитное написание: "анимеперсонажи" ~ "аниме персонажи"
+    const compactLabel = normalizedLabel.replace(/[\s-]+/g, "");
+    const compactQuery = normalizedQuery.replace(/[\s-]+/g, "");
+    if (compactLabel.includes(compactQuery) && compactQuery.length >= 3) return 60;
+    if (compactQuery.length >= 4) {
+      const compactDist = levenshteinCapped(compactQuery, compactLabel, fuzzyThreshold(compactQuery.length));
+      if (compactDist <= fuzzyThreshold(compactQuery.length)) return 42 - compactDist * 5;
+    }
+
+    if (queryTokens.length === 1) {
+      let best = 0;
+      for (const lt of labelTokens) {
+        const s = scoreTokenAgainstLabelToken(queryTokens[0], lt);
+        if (s > best) best = s;
+      }
+      return best;
+    }
+
+    // Многословный запрос: в идеале каждое слово находится в теме,
+    // но при частичном совпадении (например "оружие кс" ~ "Оружие CS 2")
+    // тоже показываем результат с пониженным скором, а не пустой список
+    let total = 0;
+    let matched = 0;
+    for (const qt of queryTokens) {
+      let best = 0;
+      for (const lt of labelTokens) {
+        const s = scoreTokenAgainstLabelToken(qt, lt);
+        if (s > best) best = s;
+      }
+      total += best;
+      if (best > 0) matched++;
+    }
+    if (matched === queryTokens.length) return Math.round(total / queryTokens.length) - 2;
+    if (matched > 0) return Math.round((total / queryTokens.length) * 0.5);
+    return 0;
+  }
+
+  function highlightThemeLabel(label, rawQuery) {
+    const plain = escapeHtml(label);
+    const q = normalizeKeepLength(rawQuery).trim();
+    if (!q) return plain;
+    const tokens = q.split(/\s+/).filter(t => t.length >= 2).sort((a, b) => b.length - a.length);
+    if (tokens.length === 0) return plain;
+
+    const normLabel = normalizeKeepLength(label);
+    const ranges = [];
+    for (const token of tokens) {
+      let from = 0;
+      while (from <= normLabel.length - token.length) {
+        const idx = normLabel.indexOf(token, from);
+        if (idx === -1) break;
+        ranges.push([idx, idx + token.length]);
+        from = idx + token.length;
+      }
+    }
+    if (ranges.length === 0) return plain;
+
+    ranges.sort((a, b) => a[0] - b[0]);
+    const merged = [];
+    for (const r of ranges) {
+      const last = merged[merged.length - 1];
+      if (last && r[0] <= last[1]) {
+        last[1] = Math.max(last[1], r[1]);
+      } else {
+        merged.push([r[0], r[1]]);
+      }
+    }
+
+    let html = "";
+    let pos = 0;
+    for (const [start, end] of merged) {
+      html += escapeHtml(label.slice(pos, start));
+      html += `<mark>${escapeHtml(label.slice(start, end))}</mark>`;
+      pos = end;
+    }
+    html += escapeHtml(label.slice(pos));
+    return html;
+  }
+
+  function getVisibleThemeOptions() {
+    return Array.from(themePickerList.querySelectorAll(".theme-picker-option"));
+  }
+
+  function renderThemeOptions(rawQuery) {
+    const query = String(rawQuery ?? "");
+    const normalizedQuery = normalizeThemeText(query);
+    const total = themeSelect.options.length;
+
+    const items = [];
     for (const option of themeSelect.options) {
       const { emoji, label } = parseThemeOptionLabel(option.textContent);
+      const normalized = normalizeThemeText(label);
+      const score = scoreThemeMatch(normalized, normalizedQuery);
+      items.push({ value: option.value, emoji, label, score, selected: option.selected });
+    }
+
+    const filtered = normalizedQuery
+      ? items.filter(i => i.score > 0).sort((a, b) => b.score - a.score || a.label.localeCompare(b.label, "ru"))
+      : items;
+
+    themePickerList.innerHTML = "";
+    const selectedValue = themeSelect.value;
+    filtered.forEach((item, i) => {
       const li = document.createElement("li");
       li.setAttribute("role", "presentation");
 
@@ -197,17 +426,22 @@ function main() {
       btn.type = "button";
       btn.className = "theme-picker-option";
       btn.setAttribute("role", "option");
-      btn.dataset.value = option.value;
-      btn.setAttribute("aria-selected", option.selected ? "true" : "false");
+      btn.dataset.value = item.value;
+      btn.setAttribute("aria-selected", (item.selected || item.value === selectedValue) ? "true" : "false");
+      btn.style.setProperty("--i", String(Math.min(i, 12)));
 
       const emojiEl = document.createElement("span");
       emojiEl.className = "theme-picker-option-emoji";
       emojiEl.setAttribute("aria-hidden", "true");
-      emojiEl.textContent = emoji;
+      emojiEl.textContent = item.emoji;
 
       const textEl = document.createElement("span");
       textEl.className = "theme-picker-option-text";
-      textEl.textContent = label;
+      if (normalizedQuery) {
+        textEl.innerHTML = highlightThemeLabel(item.label, query);
+      } else {
+        textEl.textContent = item.label;
+      }
 
       const checkEl = document.createElement("span");
       checkEl.className = "theme-picker-option-check";
@@ -216,13 +450,96 @@ function main() {
       btn.append(emojiEl, textEl, checkEl);
       btn.addEventListener("click", () => {
         clickFeedback();
-        selectTheme(option.value);
+        selectTheme(item.value);
         closeThemePicker();
       });
 
       li.appendChild(btn);
       themePickerList.appendChild(li);
+    });
+
+    const hasQuery = normalizedQuery.length > 0;
+    themePickerList.classList.toggle("is-filtering", hasQuery && filtered.length > 0);
+
+    if (themeSearchCount) {
+      themeSearchCount.textContent = hasQuery
+        ? (filtered.length > 0 ? `Найдено: ${filtered.length} из ${total}` : "")
+        : `Всего тем: ${total}`;
     }
+    if (themeSearchClear) {
+      themeSearchClear.hidden = query.length === 0;
+    }
+    if (themeSearchEmpty) {
+      themeSearchEmpty.hidden = filtered.length !== 0;
+    }
+    themePickerList.style.display = filtered.length === 0 ? "none" : "";
+  }
+
+  function buildThemePickerList() {
+    renderThemeOptions(themeSearchInput ? themeSearchInput.value : "");
+  }
+
+  function clearThemeSearch(focusInput = true) {
+    if (!themeSearchInput) return;
+    themeSearchInput.value = "";
+    renderThemeOptions("");
+    if (themeSearchInput && focusInput && themePickerOverlay.classList.contains("open")) {
+      themeSearchInput.focus({ preventScroll: true });
+    }
+  }
+
+  function initThemeSearch() {
+    if (!themeSearchInput) return;
+
+    themeSearchInput.addEventListener("input", () => {
+      window.clearTimeout(themeSearchDebounce);
+      themeSearchDebounce = window.setTimeout(() => {
+        renderThemeOptions(themeSearchInput.value);
+      }, 90);
+    });
+
+    themeSearchInput.addEventListener("keydown", event => {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        const first = getVisibleThemeOptions()[0];
+        first?.focus();
+      } else if (event.key === "Enter") {
+        // На мобильных: прячем клавиатуру, чтобы было видно результаты
+        event.preventDefault();
+        themeSearchInput.blur();
+      }
+    });
+
+    themeSearchClear?.addEventListener("click", () => {
+      clickFeedback();
+      clearThemeSearch(true);
+    });
+
+    themePickerList.addEventListener("keydown", event => {
+      const options = getVisibleThemeOptions();
+      if (options.length === 0) return;
+      const active = document.activeElement;
+      const idx = options.indexOf(active);
+      if (idx === -1) return;
+
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        (options[idx + 1] || options[0]).focus();
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        if (idx === 0) {
+          themeSearchInput.focus();
+        } else {
+          options[idx - 1].focus();
+        }
+      } else if (event.key === "Home") {
+        event.preventDefault();
+        options[0].focus();
+      } else if (event.key === "End") {
+        event.preventDefault();
+        options[options.length - 1].focus();
+      }
+    });
   }
 
   function markSelectedThemeOption() {
@@ -235,7 +552,12 @@ function main() {
   function openThemePicker() {
     if (themePickerClosing || themePickerOverlay.classList.contains("open")) return;
 
-    markSelectedThemeOption();
+    if (themeSearchInput) {
+      themeSearchInput.value = "";
+      renderThemeOptions("");
+    } else {
+      markSelectedThemeOption();
+    }
     themePickerOverlay.hidden = false;
     themePickerOverlay.classList.remove("closing");
     themePickerTrigger.setAttribute("aria-expanded", "true");
@@ -246,7 +568,12 @@ function main() {
       themePickerOverlay.classList.add("open");
       const selected = themePickerList.querySelector('.theme-picker-option[aria-selected="true"]');
       selected?.scrollIntoView({ block: "nearest" });
-      selected?.focus();
+      if (themeSearchInput) {
+        // Фокус в поиск — клавиатура открыта сразу, список крутится под ним
+        themeSearchInput.focus({ preventScroll: true });
+      } else {
+        selected?.focus();
+      }
     });
   }
 
@@ -265,6 +592,7 @@ function main() {
       if (!revealOverlay.classList.contains("active")) {
         document.body.classList.remove("modal-open");
       }
+      themeSearchInput?.blur();
       themePickerTrigger.focus();
     };
 
@@ -304,6 +632,7 @@ function main() {
   }
 
   buildThemePickerList();
+  initThemeSearch();
   syncThemeTrigger();
   setAccentForTheme(themeSelect.value);
 
@@ -324,6 +653,11 @@ function main() {
     if (event.key !== "Escape") return;
     if (!themePickerOverlay.classList.contains("open")) return;
     event.preventDefault();
+    // Первый Esc очищает поиск, второй — закрывает
+    if (themeSearchInput && themeSearchInput.value) {
+      clearThemeSearch(true);
+      return;
+    }
     closeThemePicker();
   });
 

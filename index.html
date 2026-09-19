@@ -73,6 +73,7 @@
             <option value="liminals">🚪 Лиминальность</option>
             <option value="creepypasta">👻 Крипипаста</option>
             <option value="myth_cr">🐉 Существа Из Мифов</option>
+            <option value="horrors">👿 Злодеи Хорроров</option>
             <option value="film_places">🏰 Места Из Фильмов</option>
             <option value="cities">🏙️ Города</option>
             <option value="music">🎤 Исполнители</option>
@@ -162,8 +163,40 @@
             aria-modal="true"
             aria-labelledby="theme-picker-title"
         >
-            <div id="theme-picker-title" class="theme-picker-title">Выберите тему</div>
+            <div class="theme-picker-header">
+                <div id="theme-picker-title" class="theme-picker-title">Выберите тему</div>
+                <div class="theme-picker-search">
+                    <span class="theme-picker-search-icon" aria-hidden="true"></span>
+                    <input
+                        type="search"
+                        id="theme-search-input"
+                        class="theme-search-input"
+                        placeholder="Найти тему…"
+                        autocomplete="off"
+                        autocorrect="off"
+                        autocapitalize="off"
+                        spellcheck="false"
+                        inputmode="search"
+                        enterkeyhint="search"
+                        aria-label="Поиск темы"
+                        aria-controls="theme-picker-list"
+                    >
+                    <button
+                        type="button"
+                        id="theme-search-clear"
+                        class="theme-search-clear"
+                        aria-label="Очистить поиск"
+                        hidden
+                    >✕</button>
+                </div>
+                <div id="theme-search-count" class="theme-search-count" aria-live="polite"></div>
+            </div>
             <ul id="theme-picker-list" class="theme-picker-list" role="listbox" aria-labelledby="theme-picker-title"></ul>
+            <div id="theme-search-empty" class="theme-search-empty" hidden>
+                <div class="theme-search-empty-emoji" aria-hidden="true">😕</div>
+                <div>Ничего не найдено</div>
+                <div class="theme-search-empty-hint">Попробуйте другое слово или проверьте опечатки</div>
+            </div>
         </div>
     </div>
 

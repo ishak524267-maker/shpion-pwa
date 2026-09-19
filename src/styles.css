@@ -332,9 +332,24 @@ textarea:focus {
 .theme-picker-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(4, 6, 12, 0.72);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: rgba(4, 6, 12, 0);
+  backdrop-filter: blur(0px);
+  -webkit-backdrop-filter: blur(0px);
+  transition: background 0.24s ease, backdrop-filter 0.24s ease, -webkit-backdrop-filter 0.24s ease;
+}
+
+/* Затемнение + размытие нарастают вместе с выездом карточки (та же длительность 0.24s) */
+.theme-picker-overlay.open .theme-picker-backdrop {
+  background: rgba(4, 6, 12, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Браузеры без backdrop-filter: компенсируем плотнее затемнением */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .theme-picker-overlay.open .theme-picker-backdrop {
+    background: rgba(4, 6, 12, 0.78);
+  }
 }
 
 .theme-picker-panel {
@@ -366,16 +381,187 @@ textarea:focus {
   opacity: 0;
 }
 
+.theme-picker-header {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 14px 10px;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.01);
+}
+
 .theme-picker-title {
   flex: 0 0 auto;
-  padding: 16px 18px 12px;
+  padding: 0 4px 2px;
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-muted);
   text-align: left;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: none;
+}
+
+.theme-picker-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.theme-picker-search-icon {
+  position: absolute;
+  left: 12px;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+  opacity: 0.7;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238e99ab' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='7'/><line x1='21' y1='21' x2='16.5' y2='16.5'/></svg>");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.theme-search-input {
+  width: 100%;
+  padding: 10px 34px 10px 36px;
+  font-size: 0.9rem;
+  border-radius: var(--radius-sm);
+}
+
+/* Только тонкая рамка: гасим внешнее свечение (input:focus) и глобальный outline (:focus-visible) */
+.theme-search-input:focus,
+.theme-search-input:focus-visible {
+  border-color: var(--accent-color);
+  box-shadow: none;
+  outline: none;
+}
+
+.theme-search-input::-webkit-search-cancel-button,
+.theme-search-input::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
+.theme-search-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  line-height: 1;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  box-shadow: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+.theme-search-clear:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+  box-shadow: none;
+  opacity: 1;
+}
+
+.theme-search-clear:active {
+  transform: translateY(-50%) scale(0.92);
+}
+
+.theme-search-clear[hidden] {
+  display: none;
+}
+
+.theme-search-count {
+  min-height: 0;
+  padding: 0 4px;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  text-align: left;
+}
+
+.theme-search-count:empty {
+  display: none;
+}
+
+.theme-search-empty {
+  padding: 28px 18px 32px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  animation: screenFade 0.22s ease-out;
+}
+
+.theme-search-empty-emoji {
+  font-size: 2rem;
+  margin-bottom: 8px;
+}
+
+.theme-search-empty-hint {
+  margin-top: 4px;
+  font-size: 0.78rem;
+  opacity: 0.8;
+}
+
+.theme-picker-option-text mark {
+  background: rgba(var(--accent-rgb), 0.35);
+  color: var(--text-main);
+  border-radius: 4px;
+  padding: 0 1px;
+}
+
+@keyframes themeOptionIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.theme-picker-list.is-filtering .theme-picker-option {
+  animation: themeOptionIn 0.22s ease both;
+  animation-delay: calc(var(--i, 0) * 22ms);
+}
+
+/* Мобильная оптимизация поиска */
+@media (max-width: 480px), (pointer: coarse) {
+  .theme-search-input {
+    /* 16px — без автозума на iOS, удобнее для пальца на Android */
+    font-size: 16px;
+    padding: 12px 44px 12px 38px;
+    touch-action: manipulation;
+  }
+
+  .theme-search-clear {
+    /* Расширенная хит-зона для пальца, визуально кнопка та же */
+    right: 4px;
+    width: 34px;
+    height: 34px;
+    font-size: 0.8rem;
+    touch-action: manipulation;
+  }
+
+  /* Слабые GPU: блюр дешевле, анимация списка короче */
+  .theme-picker-overlay.open .theme-picker-backdrop {
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+
+  .theme-picker-list.is-filtering .theme-picker-option {
+    animation-delay: calc(var(--i, 0) * 12ms);
+  }
 }
 
 .theme-picker-list {
