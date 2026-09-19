@@ -22,6 +22,18 @@ const themesData = {
     cars: ["Toyota", "Mercedes-Benz", "BMW", "Audi", "Ford", "Honda", "Tesla", "Hyundai", "Kia", "Porsche", "Volkswagen", "Lexus", "Mazda", "Nissan", "Chevrolet", "Ferrari", "Lamborghini", "Volvo", "Subaru", "Land Rover", "Aston Martin", "Bugatti", "Jaguar", "Maserati", "Bentley", "McLaren", "Rolls-Royce", "Pagani", "LADA", "Koenigsegg"],
     moto: ["Honda", "Yamaha", "Kawasaki", "Suzuki", "BMW", "Ducati", "KTM", "Harley-Davidson", "Triumph", "Royal Enfield", "Aprilia", "Indian", "Husqvarna", "Benelli", "CFMoto"],
     prof: ["Врач", "Инженер", "Учитель", "Программист", "Пилот", "Повар", "Юрист", "Архитектор", "Электрик", "Механик", "Дизайнер", "Маркетолог", "Журналист", "Экономист", "Психолог", "Фермер", "Строитель", "Полицейский", "Пожарный", "Ученый", "Фотограф", "Актер", "Музыкант", "Ветеринар", "Фармацевт", "Тренер", "Менеджер", "Бухгалтер", "Стоматолог", "Эколог", "Продавец", "Водитель", "Официант", "Медсестра", "Стюардесса", "Охранник", "Кассир", "Грузчик", "Курьер", "Уборщик", "Адвокат", "Судья", "Риелтор", "Библиотекарь", "Сантехник", "Сварщик", "Почтальон", "Парикмахер", "Косметолог", "Секретарь"],
+    weapons: [],
+    liminals: [],
+    creepypasta: [],
+    myth_cr: [],
+    film_places: [],
+    cities: [],
+    music: [],
+    books: [],
+    mel_seasons: [],
+    dota_2: [],
+    genshin: [],
+    phones: [],
 };
 
 // ES-модуль app.js читает базу слов через globalThis
