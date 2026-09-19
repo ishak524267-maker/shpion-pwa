@@ -148,6 +148,7 @@ function main() {
   const themeTriggerEmoji = qs("theme-trigger-emoji");
   const themeTriggerText = qs("theme-trigger-text");
   const themePickerOverlay = qs("theme-picker-overlay");
+  const themePickerPanel = themePickerOverlay?.querySelector(".theme-picker-panel");
   const themePickerList = qs("theme-picker-list");
   const customContainer = qs("custom-theme-container");
   const customWordsInput = qs("custom-words");
@@ -399,10 +400,33 @@ function main() {
     return Array.from(themePickerList.querySelectorAll(".theme-picker-option"));
   }
 
+  function lockThemePanelTop() {
+    if (!themePickerPanel || themePickerPanel.classList.contains("top-locked")) return;
+    if (!themePickerOverlay || !themePickerOverlay.classList.contains("open")) return;
+    const overlayRect = themePickerOverlay.getBoundingClientRect();
+    const panelRect = themePickerPanel.getBoundingClientRect();
+    const overlayPaddingTop = parseFloat(getComputedStyle(themePickerOverlay).paddingTop) || 0;
+    const marginTop = Math.max(0, (panelRect.top - overlayRect.top) - overlayPaddingTop);
+    themePickerPanel.style.setProperty("--locked-top", `${marginTop}px`);
+    themePickerPanel.classList.add("top-locked");
+  }
+
+  function unlockThemePanelTop() {
+    if (!themePickerPanel || !themePickerPanel.classList.contains("top-locked")) return;
+    themePickerPanel.classList.remove("top-locked");
+    themePickerPanel.style.removeProperty("--locked-top");
+  }
+
   function renderThemeOptions(rawQuery) {
     const query = String(rawQuery ?? "");
     const normalizedQuery = normalizeThemeText(query);
     const total = themeSelect.options.length;
+
+    if (normalizedQuery.length > 0) {
+      lockThemePanelTop();
+    } else {
+      unlockThemePanelTop();
+    }
 
     const items = [];
     for (const option of themeSelect.options) {
@@ -481,6 +505,7 @@ function main() {
 
   function clearThemeSearch(focusInput = true) {
     if (!themeSearchInput) return;
+    unlockThemePanelTop();
     themeSearchInput.value = "";
     renderThemeOptions("");
     if (themeSearchInput && focusInput && themePickerOverlay.classList.contains("open")) {
@@ -493,6 +518,9 @@ function main() {
 
     themeSearchInput.addEventListener("input", () => {
       window.clearTimeout(themeSearchDebounce);
+      if (themeSearchInput.value.trim().length > 0) {
+        lockThemePanelTop();
+      }
       themeSearchDebounce = window.setTimeout(() => {
         renderThemeOptions(themeSearchInput.value);
       }, 90);
@@ -581,6 +609,7 @@ function main() {
     if (!themePickerOverlay.classList.contains("open") || themePickerClosing) return;
 
     themePickerClosing = true;
+    unlockThemePanelTop();
     themePickerOverlay.classList.add("closing");
     themePickerOverlay.classList.remove("open");
     themePickerTrigger.setAttribute("aria-expanded", "false");
