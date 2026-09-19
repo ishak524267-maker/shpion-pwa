@@ -1,5 +1,5 @@
 // Меняй версию при каждом деплое — это автоматически сбросит кеш у всех пользователей
-const CACHE_VERSION = "spy-pro-v29";
+const CACHE_VERSION = "spy-pro-v30";
 
 const STATIC_ASSETS = [
   "./",

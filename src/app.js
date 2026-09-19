@@ -596,12 +596,7 @@ function main() {
       themePickerOverlay.classList.add("open");
       const selected = themePickerList.querySelector('.theme-picker-option[aria-selected="true"]');
       selected?.scrollIntoView({ block: "nearest" });
-      if (themeSearchInput) {
-        // Фокус в поиск — клавиатура открыта сразу, список крутится под ним
-        themeSearchInput.focus({ preventScroll: true });
-      } else {
-        selected?.focus();
-      }
+      selected?.focus();
     });
   }
 
